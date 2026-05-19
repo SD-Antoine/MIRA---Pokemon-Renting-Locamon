@@ -1,0 +1,9 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Edit Locamon{% endblock %}
+
+{% block body %}
+  <h1>Edit Locamon #{{ locamon.id }}</h1>
+  {% include 'locamon/_form.html.twig' with {'form': form} %}
+  <a href="{{ path('locamon.index') }}">back to list</a>
+{% endblock %}

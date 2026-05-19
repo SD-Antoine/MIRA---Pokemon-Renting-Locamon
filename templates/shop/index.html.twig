@@ -1,0 +1,131 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Shop - Locamons for Sale{% endblock %}
+
+{% block body %}
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold mb-8">Locamon Shop</h1>
+        
+        <!-- Search Bar -->
+        <div class="mb-8">
+            <form method="GET" class="flex gap-2">
+                <input 
+                    type="text" 
+                    name="search" 
+                    placeholder="Search by name or nickname..." 
+                    value="{{ search }}"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded"
+                >
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    Search
+                </button>
+                {% if search %}
+                    <a href="{{ path('shop.index') }}" class="px-6 py-2 bg-gray-400 text-white rounded hover:bg-gray-500">
+                        Clear
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Cards Grid -->
+        {% if locamons.items|length > 0 %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {% for locamon in locamons %}
+                    {% set pokemon = locamon.getPokemon() %}
+                    {% set frenchName = null %}
+                    {% for translation in pokemon.getTranslations() %}
+                        {% if translation.getLang() == 'fr' %}
+                            {% set frenchName = translation.getName() %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% set sprite = null %}
+                    {% for sprite_item in pokemon.getSprites() %}
+                        {% if locamon.isShiny() and sprite_item.getName() == 'front_shiny' %}
+                            {% set sprite = sprite_item %}
+                        {% elseif not locamon.isShiny() and sprite_item.getName() == 'front_default' %}
+                            {% set sprite = sprite_item %}
+                        {% endif %}
+                    {% endfor %}
+
+                    <a href="{{ path('shop.show', {'id': locamon.id}) }}" class="block">
+                        <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer">
+                            <!-- Sprite -->
+                            <div class="bg-gray-100 h-48 flex items-center justify-center">
+                                {% if sprite %}
+                                    <img src="{{ sprite.getUrl() }}" alt="{{ frenchName }}" class="h-40 w-40 object-contain">
+                                {% else %}
+                                    <div class="text-gray-400">No sprite</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Card Body -->
+                            <div class="p-4">
+                                <!-- Name and Nickname -->
+                                <h3 class="text-lg font-bold text-gray-800">
+                                    {{ frenchName ?? 'Unknown' }}
+                                    {% if locamon.getNickname() %}
+                                        <span class="text-sm text-gray-600">({{ locamon.getNickname() }})</span>
+                                    {% endif %}
+                                </h3>
+                                
+                                <!-- Shiny Badge -->
+                                {% if locamon.isShiny() %}
+                                    <div class="inline-block mt-2 px-3 py-1 bg-yellow-300 text-yellow-900 rounded-full text-xs font-bold">
+                                        ✨ Shiny
+                                    </div>
+                                {% endif %}
+                                
+                                <!-- Price -->
+                                <div class="mt-4 text-2xl font-bold text-green-600">
+                                    {{ locamon.getPrice()/100 ? locamon.getPrice()/100 ~ '$' : 'N/A' }}
+                                </div>
+                                <div class="text-sm text-gray-600">per day</div>
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            <div class="flex justify-center mt-8 gap-2">
+                {% if locamons.getPageCount() > 1 %}
+                    <nav class="flex items-center gap-2">
+                        {% if (locamons.getCurrentPageNumber() > 1) %}
+                            <a href="{{ path('shop.index', {'page': (locamons.getCurrentPageNumber() - 1), 'search': search}) }}" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Previous
+                            </a>
+                        {% endif %}
+                        
+                        {% for page in 1..locamons.getPageCount() %}
+                            <a 
+                                href="{{ path('shop.index', {'page': page, 'search': search}) }}"
+                                class="px-4 py-2 rounded {% if page == locamons.getCurrentPageNumber() %}bg-blue-600 text-white{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
+                            >
+                                {{ page }}
+                            </a>
+                        {% endfor %}
+                        
+                        {% if (locamons.getCurrentPageNumber() < locamons.getPageCount()) %}
+                            <a href="{{ path('shop.index', {'page': (locamons.getCurrentPageNumber() + 1), 'search': search}) }}" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Next
+                            </a>
+                        {% endif %}
+                    </nav>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="text-center py-16">
+                <p class="text-xl text-gray-600">No Locamons found</p>
+                {% if search %}
+                    <p class="text-gray-500 mt-2">Try a different search term</p>
+                    <a href="{{ path('shop.index') }}" class="inline-block mt-4 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        View All
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+

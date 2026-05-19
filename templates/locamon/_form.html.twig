@@ -1,0 +1,28 @@
+{{ form_start(form) }}
+  {{ form_row(form.pokemon) }}
+  {{ form_row(form.nickname) }}
+
+  <h3>IVs</h3>
+  {{ form_row(form.ivAtk) }}
+  {{ form_row(form.ivSpAtk) }}
+  {{ form_row(form.ivSpd) }}
+  {{ form_row(form.ivDef) }}
+  {{ form_row(form.ivSpDef) }}
+  {{ form_row(form.ivHp) }}
+
+  <h3>EVs</n3>
+  {{ form_row(form.evAtk) }}
+  {{ form_row(form.evSpAtk) }}
+  {{ form_row(form.evDef) }}
+  {{ form_row(form.evSpDef) }}
+  {{ form_row(form.evSpd) }}
+  {{ form_row(form.evHp) }}
+
+  {{ form_row(form.price) }}
+  {{ form_row(form.stock) }}
+  {{ form_row(form.level) }}
+  {{ form_row(form.nature) }}
+  {{ form_row(form.shiny) }}
+
+  <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700 cursor-pointer">Save</button>
+{{ form_end(form) }}

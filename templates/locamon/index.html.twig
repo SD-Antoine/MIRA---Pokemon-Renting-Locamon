@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Locamon - list{% endblock %}
+
+{% block body %}
+  <h1>Locamons</h1>
+  <p><a href="{{ path('locamon.create') }}">Create new Locamon</a></p>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Pokemon</th><th>Nickname</th><th>Level</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for l in locamons %}
+        <tr>
+          <td>{{ l.id }}</td>
+          <td>{{ l.pokemon ? '#' ~ l.pokemon.id : '' }}</td>
+          <td>{{ l.nickname }}</td>
+          <td>{{ l.level }}</td>
+          <td>
+            <a href="{{ path('locamon.show', {'id': l.id}) }}">show</a>
+            <a href="{{ path('locamon.edit', {'id': l.id}) }}">edit</a>
+            <form method="post" action="{{ path('locamon.delete', {'id': l.id}) }}" style="display:inline">
+              <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ l.id) }}">
+              <button type="submit">delete</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">No locamons found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {{ knp_pagination_render(locamons) }}
+{% endblock %}

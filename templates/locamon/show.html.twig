@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Locamon #{{ locamon.id }}{% endblock %}
+
+{% block body %}
+  <h1>Locamon #{{ locamon.id }}</h1>
+  <ul>
+    <li>Pokemon: {{ locamon.pokemon ? '#' ~ locamon.pokemon.id : '—' }}</li>
+    <li>Nickname: {{ locamon.nickname }}</li>
+    <li>Level: {{ locamon.level }}</li>
+    <li>Nature: {{ locamon.nature }}</li>
+    <li>Shiny: {{ locamon.shiny ? 'Yes' : 'No' }}</li>
+  </ul>
+  <a href="{{ path('locamon.edit', {'id': locamon.id}) }}">edit</a>
+  <a href="{{ path('locamon.index') }}">back to list</a>
+{% endblock %}

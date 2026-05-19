@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+nav {
+    transform: translateY(-50%)
+}
+
+.font-poke {
+    font-family: "Pokemon";
+}
+
+.outline-font-poke {
+    -webkit-text-stroke: 2px darkblue;
+}
+
+@font-face {
+    font-family: 'Pokemon';
+    src: url('fonts/PokemonSolid.ttf');
+}
