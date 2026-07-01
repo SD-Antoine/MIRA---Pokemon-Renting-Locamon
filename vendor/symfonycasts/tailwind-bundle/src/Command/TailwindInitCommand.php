@@ -64,7 +64,7 @@ class TailwindInitCommand extends Command
         $this->tailwindBuilder->setOutput($io);
 
         $process = $this->tailwindBuilder->runInit();
-        $process->wait(function ($type, $buffer) use ($io) {
+        $process->wait(static function ($type, $buffer) use ($io) {
             $io->write($buffer);
         });
 

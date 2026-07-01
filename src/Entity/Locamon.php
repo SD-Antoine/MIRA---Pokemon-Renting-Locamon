@@ -256,6 +256,40 @@ class Locamon
         return $this;
     }
 
+    /**
+     * Source unique de vérité pour la conversion du prix.
+     *
+     * Le champ `price` peut contenir soit des euros, soit des centimes selon
+     * les données. Heuristique : au-delà de 10000, on considère que la valeur
+     * est déjà stockée en centimes. Cette méthode est utilisée à la fois par
+     * les templates (affichage) et par le checkout Stripe, afin d'éviter toute
+     * incohérence entre les pages.
+     *
+     * @return int Montant en centimes (unité attendue par Stripe), 0 si non défini.
+     */
+    public function getPriceInCents(): int
+    {
+        if ($this->price === null || $this->price <= 0) {
+            return 0;
+        }
+
+        return $this->price > 10000 ? $this->price : $this->price * 100;
+    }
+
+    /**
+     * Prix affichable en euros (ex. 12.50).
+     *
+     * @return float|null null si aucun prix n'est défini.
+     */
+    public function getPriceInEuros(): ?float
+    {
+        if ($this->price === null || $this->price <= 0) {
+            return null;
+        }
+
+        return $this->getPriceInCents() / 100;
+    }
+
     public function getStock(): ?int
     {
         return $this->stock;

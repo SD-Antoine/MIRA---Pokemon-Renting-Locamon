@@ -18,6 +18,7 @@ return [
         '/locamon' => [[['_route' => 'locamon.index', '_controller' => 'App\\Controller\\LocamonController::index'], null, null, null, false, false, null]],
         '/locamon/new' => [[['_route' => 'locamon.create', '_controller' => 'App\\Controller\\LocamonController::new'], null, null, null, false, false, null]],
         '/pokemons' => [[['_route' => 'pokemon.index', '_controller' => 'App\\Controller\\PokemonsController::index'], null, null, null, false, false, null]],
+        '/' => [[['_route' => 'home', '_controller' => 'App\\Controller\\ShopController::index'], null, null, null, false, false, null]],
         '/shop' => [[['_route' => 'shop.index', '_controller' => 'App\\Controller\\ShopController::index'], null, null, null, false, false, null]],
         '/shop/webhook/stripe' => [[['_route' => 'shop.webhook_stripe', '_controller' => 'App\\Controller\\ShopController::webhookStripe'], null, ['POST' => 0], null, false, false, null]],
         '/login' => [[['_route' => 'user.login', '_controller' => 'App\\Controller\\UserController::login'], null, null, null, false, false, null]],
@@ -67,9 +68,10 @@ return [
                     .'|manage/([^/]++)/delete(*:537)'
                 .')'
                 .'|/pokemon/([^/]++)(*:563)'
-                .'|/shop/([^/]++)(?'
-                    .'|(*:588)'
-                    .'|/checkout(*:605)'
+                .'|/shop/(?'
+                    .'|(\\d+)(*:585)'
+                    .'|(\\d+)/checkout(*:607)'
+                    .'|(\\d+)/success(*:628)'
                 .')'
             .')/?$}sDu',
     ],
@@ -98,9 +100,10 @@ return [
         506 => [[['_route' => 'locamon.edit', '_controller' => 'App\\Controller\\LocamonController::edit'], ['id'], null, null, false, false, null]],
         537 => [[['_route' => 'locamon.delete', '_controller' => 'App\\Controller\\LocamonController::delete'], ['id'], ['POST' => 0], null, false, false, null]],
         563 => [[['_route' => 'pokemon.show', '_controller' => 'App\\Controller\\PokemonsController::show'], ['id'], null, null, false, true, null]],
-        588 => [[['_route' => 'shop.show', '_controller' => 'App\\Controller\\ShopController::show'], ['id'], null, null, false, true, null]],
-        605 => [
-            [['_route' => 'shop.checkout', '_controller' => 'App\\Controller\\ShopController::checkout'], ['id'], ['POST' => 0], null, false, false, null],
+        585 => [[['_route' => 'shop.show', '_controller' => 'App\\Controller\\ShopController::show'], ['id'], null, null, false, true, null]],
+        607 => [[['_route' => 'shop.checkout', '_controller' => 'App\\Controller\\ShopController::checkout'], ['id'], ['POST' => 0], null, false, false, null]],
+        628 => [
+            [['_route' => 'shop.success', '_controller' => 'App\\Controller\\ShopController::success'], ['id'], null, null, false, false, null],
             [null, null, null, null, false, false, 0],
         ],
     ],

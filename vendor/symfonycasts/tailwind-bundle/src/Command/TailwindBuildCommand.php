@@ -53,7 +53,7 @@ class TailwindBuildCommand extends Command
             inputFile: $input->getArgument('input_css'),
             postCssConfigFile: $input->getOption('postcss'),
         );
-        $process->wait(function ($type, $buffer) use ($io) {
+        $process->wait(static function ($type, $buffer) use ($io) {
             $io->write($buffer);
         });
 

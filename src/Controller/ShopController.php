@@ -8,10 +8,15 @@ use Knp\Component\Pager\PaginatorInterface as KnpPaginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 class ShopController extends AbstractController
 {
+    /**
+     * Page d'accueil : la boutique répond à la fois sur "/" et "/shop".
+     */
+    #[Route('/', name: 'home')]
     #[Route('/shop', name: 'shop.index')]
     public function index(Request $request, EntityManagerInterface $em, KnpPaginator $paginator): Response
     {
@@ -41,71 +46,61 @@ class ShopController extends AbstractController
 
         return $this->render('shop/index.html.twig', [
             'locamons' => $pagination,
-            'search' => $search
+            'search' => $search,
         ]);
     }
 
-    #[Route('/shop/{id}', name: 'shop.show')]
-    public function show(Locamon $locamon): Response
+    #[Route('/shop/{id}', name: 'shop.show', requirements: ['id' => '\d+'])]
+    public function show(Locamon $locamon, Request $request): Response
     {
+        // Petit message si l'utilisateur revient d'un paiement annulé.
+        if ($request->query->getBoolean('canceled')) {
+            $this->addFlash('error', 'Paiement annulé. Aucune somme n\'a été débitée.');
+        }
+
         return $this->render('shop/show.html.twig', [
-            'locamon' => $locamon
+            'locamon' => $locamon,
         ]);
     }
 
-    #[Route('/shop/{id}/checkout', name: 'shop.checkout', methods: ['POST'])]
+    #[Route('/shop/{id}/checkout', name: 'shop.checkout', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function checkout(Locamon $locamon, Request $request): Response
     {
-        // Basic validation of days (cap to avoid huge totals)
+        // Validation du nombre de jours (borné pour éviter des totaux absurdes).
         $days = (int) $request->request->get('days', 1);
-        if ($days < 1) {
-            $days = 1;
-        }
-        // Cap reservation days to a sensible maximum (1 year)
-        $days = min($days, 365);
+        $days = max(1, min($days, 365));
 
-        // CSRF protection (token name uses locamon id)
+        // Protection CSRF (le nom du token contient l'id du locamon).
         $token = $request->request->get('_token');
         if (!$this->isCsrfTokenValid('checkout' . $locamon->getId(), $token)) {
-            $this->addFlash('error', 'Invalid CSRF token.');
+            $this->addFlash('error', 'Jeton CSRF invalide.');
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
 
-        // Check stock if applicable
+        // Vérification du stock le cas échéant.
         $stock = $locamon->getStock();
         if ($stock !== null && $stock <= 0) {
-            $this->addFlash('error', 'This item is out of stock.');
+            $this->addFlash('error', 'Ce Locamon est en rupture de stock.');
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
 
-        // Prepare Stripe
-        $secret = $_ENV['STRIPE_SECRET'] ?? ($_SERVER['STRIPE_SECRET'] ?? null);
+        $secret = $this->getStripeSecret();
         if (!$secret) {
-            $this->addFlash('error', 'Stripe secret key not configured.');
+            $this->addFlash('error', 'La clé secrète Stripe n\'est pas configurée.');
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
 
         \Stripe\Stripe::setApiKey($secret);
 
-        // Stripe expects an integer amount in the smallest currency unit (cents)
-        // Detect whether the stored price is already in cents or in euros.
-        $storedPrice = $locamon->getPrice() ?? 0;
-        if ($storedPrice <= 0) {
-            $this->addFlash('error', 'Invalid price for this item.');
+        // Montant unitaire en centimes : source unique de vérité dans l'entité Locamon.
+        $unitAmount = $locamon->getPriceInCents();
+        if ($unitAmount <= 0) {
+            $this->addFlash('error', 'Prix invalide pour ce Locamon.');
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
 
-        // Heuristic: if the stored price is very large (> 10000) we assume it's already in cents.
-        if ($storedPrice > 10000) {
-            $unitAmount = (int) $storedPrice;
-        } else {
-            // Otherwise treat it as euros and convert to cents
-            $unitAmount = (int) round($storedPrice * 100);
-        }
-
-        // Ensure total won't exceed Stripe limit (99,999,999 cents -> €999,999.99)
-        $total = $unitAmount * $days;
-        if ($total > 99999999) {
+        // Stripe limite le montant total à 99 999 999 centimes (≈ 999 999,99 €).
+        if ($unitAmount * $days > 99999999) {
             $this->addFlash('error', 'Le montant total est trop élevé pour Stripe. Réduisez le nombre de jours ou le prix.');
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
@@ -114,94 +109,116 @@ class ShopController extends AbstractController
             $session = \Stripe\Checkout\Session::create([
                 'payment_method_types' => ['card'],
                 'mode' => 'payment',
+                // Les metadata sont posées sur la SESSION (et non sur product_data) :
+                // c'est ce qu'on relit de façon fiable au retour et dans le webhook.
+                'metadata' => [
+                    'locamon_id' => (string) $locamon->getId(),
+                    'days' => (string) $days,
+                ],
+                'client_reference_id' => (string) $locamon->getId(),
                 'line_items' => [[
                     'price_data' => [
                         'currency' => 'eur',
                         'product_data' => [
-                            'name' => ($locamon->getNickname() ? $locamon->getNickname() . ' - ' : '') . $locamon->getPokemon()->getTranslations()->first()?->getName(),
-                            'metadata' => [
-                                'locamon_id' => $locamon->getId(),
-                                'days' => $days,
-                            ],
+                            'name' => ($locamon->getNickname() ? $locamon->getNickname() . ' - ' : '')
+                                . $locamon->getPokemon()->getTranslations()->first()?->getName(),
                         ],
                         'unit_amount' => $unitAmount,
                     ],
                     'quantity' => $days,
                 ]],
-                'success_url' => $this->generateUrl('shop.show', ['id' => $locamon->getId()], 
-                    \Symfony\Component\Routing\Generator\UrlGeneratorInterface::ABSOLUTE_URL) . '?paid=1',
-                'cancel_url' => $this->generateUrl('shop.show', ['id' => $locamon->getId()], 
-                    \Symfony\Component\Routing\Generator\UrlGeneratorInterface::ABSOLUTE_URL) . '?canceled=1',
+                // {CHECKOUT_SESSION_ID} est remplacé par Stripe ; on le relit dans success().
+                'success_url' => $this->generateUrl('shop.success', ['id' => $locamon->getId()], UrlGeneratorInterface::ABSOLUTE_URL)
+                    . '?session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => $this->generateUrl('shop.show', ['id' => $locamon->getId()], UrlGeneratorInterface::ABSOLUTE_URL)
+                    . '?canceled=1',
             ]);
 
             return $this->redirect($session->url);
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Stripe error: ' . $e->getMessage());
+            $this->addFlash('error', 'Erreur Stripe : ' . $e->getMessage());
             return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
         }
     }
 
-// #[Route('/shop/webhook/stripe', name: 'shop.webhook_stripe', methods: ['POST'])]
-// public function webhookStripe(Request $request, EntityManagerInterface $em): Response
-// {
-//     $payload = $request->getContent();
-//     $sig_header = $request->headers->get('stripe-signature');
-//     $endpoint_secret = $_ENV['STRIPE_WEBHOOK_SECRET'];
+    /**
+     * Retour de Stripe après un paiement réussi.
+     *
+     * C'est ICI que la commande est finalisée en développement local : Stripe ne
+     * pouvant pas joindre 127.0.0.1, on ne peut pas compter sur le webhook. On
+     * récupère la session, on vérifie qu'elle est bien payée, puis on décrémente
+     * le stock une seule fois (garde anti double-comptage via la session HTTP).
+     */
+    #[Route('/shop/{id}/success', name: 'shop.success', requirements: ['id' => '\d+'])]
+    public function success(Locamon $locamon, Request $request, EntityManagerInterface $em): Response
+    {
+        $sessionId = $request->query->get('session_id');
+        $secret = $this->getStripeSecret();
 
-//     try {
-//         $event = \Stripe\Webhook::constructEvent(
-//             $payload,
-//             $sig_header,
-//             $endpoint_secret
-//         );
-//     } catch (\Stripe\Exception\SignatureVerificationException $e) {
-//         return new Response('Invalid signature', 400);
-//     } catch (\Exception $e) {
-//         return new Response('Webhook error: ' . $e->getMessage(), 400);
-//     }
+        if (!$sessionId || !$secret) {
+            $this->addFlash('error', 'Session de paiement introuvable.');
+            return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
+        }
 
-//     if ($event->type === 'checkout.session.completed') {
-//         /** @var \Stripe\Checkout\Session $session */
-//         $session = $event->data->object;
+        \Stripe\Stripe::setApiKey($secret);
 
-//         // Récupérer line_items de la session
-//         $lineItems = \Stripe\Checkout\Session::allLineItems($session->id);
+        try {
+            $session = \Stripe\Checkout\Session::retrieve($sessionId);
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Impossible de vérifier le paiement : ' . $e->getMessage());
+            return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
+        }
 
-//         foreach ($lineItems->data as $item) {
+        if (($session->payment_status ?? null) !== 'paid') {
+            $this->addFlash('error', 'Le paiement n\'a pas été confirmé.');
+            return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
+        }
 
-//             // On récupère l'ID Locamon stocké dans metadata du produit
-//             $locamonId = $item->metadata->locamon_id ?? null;
+        // Garde d'idempotence : on ne traite chaque session de paiement qu'une fois
+        // (évite un double décompte si l'utilisateur recharge la page de succès).
+        $httpSession = $request->getSession();
+        $processed = $httpSession->get('stripe_processed_sessions', []);
 
-//             if ($locamonId) {
-//                 $locamon = $em->getRepository(Locamon::class)->find($locamonId);
+        if (!in_array($sessionId, $processed, true)) {
+            $this->fulfillOrder($session, $em);
 
-//                 if ($locamon) {
-//                     if ($locamon->getStock() > 0) {
-//                         $locamon->setStock($locamon->getStock() - 1);
-//                         $em->flush();
-//                     }
-//                 }
-//             }
-//         }
-//     }
+            $processed[] = $sessionId;
+            $httpSession->set('stripe_processed_sessions', $processed);
 
-//     return new Response('ok', 200);
-// }
-    
+            $this->addFlash('success', 'Paiement réussi ! Ta location est confirmée. 🎉');
+        }
+
+        return $this->redirectToRoute('shop.show', ['id' => $locamon->getId()]);
+    }
+
+    /**
+     * Webhook Stripe — voie de finalisation recommandée en PRODUCTION.
+     *
+     * En local il ne se déclenche pas (Stripe ne joint pas 127.0.0.1) sauf si on
+     * lance le Stripe CLI :
+     *   stripe listen --forward-to 127.0.0.1:8000/shop/webhook/stripe
+     *
+     * Pour éviter un double décompte avec success(), n'activez la finalisation
+     * QUE d'un côté : si vous déployez avec un vrai webhook joignable, déplacez la
+     * logique de fulfillOrder() ici et retirez-la de success().
+     */
     #[Route('/shop/webhook/stripe', name: 'shop.webhook_stripe', methods: ['POST'])]
     public function webhookStripe(Request $request, EntityManagerInterface $em): Response
     {
-        \Stripe\Stripe::setApiKey($_ENV['STRIPE_SECRET']); // <-- essentiel pour allLineItems()
+        $secret = $this->getStripeSecret();
+        $endpointSecret = $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ($_SERVER['STRIPE_WEBHOOK_SECRET'] ?? null);
 
-        $payload = $request->getContent();
-        $sig_header = $request->headers->get('stripe-signature');
-        $endpoint_secret = $_ENV['STRIPE_WEBHOOK_SECRET'];
+        if (!$secret || !$endpointSecret) {
+            return new Response('Stripe not configured', 500);
+        }
+
+        \Stripe\Stripe::setApiKey($secret);
 
         try {
             $event = \Stripe\Webhook::constructEvent(
-                $payload,
-                $sig_header,
-                $endpoint_secret
+                $request->getContent(),
+                $request->headers->get('stripe-signature'),
+                $endpointSecret
             );
         } catch (\Stripe\Exception\SignatureVerificationException $e) {
             return new Response('Invalid signature', 400);
@@ -210,25 +227,36 @@ class ShopController extends AbstractController
         }
 
         if ($event->type === 'checkout.session.completed') {
-            $session = $event->data->object;
-
-            // 🔥 LIGNE QUI PLANTAIT AVANT
-            $lineItems = \Stripe\Checkout\Session::allLineItems($session->id);
-
-            foreach ($lineItems->data as $item) {
-                $locamonId = $item->metadata->locamon_id ?? null;
-
-                if ($locamonId) {
-                    $locamon = $em->getRepository(Locamon::class)->findOneBy(['id' => $locamonId]);
-
-                    if ($locamon && $locamon->getStock() > 0) {
-                        $locamon->setStock($locamon->getStock() - 1);
-                        $em->flush();
-                    }
-                }
-            }
+            // En local, success() a déjà finalisé. En production, décommentez :
+            // $this->fulfillOrder($event->data->object, $em);
         }
 
         return new Response('ok', 200);
+    }
+
+    /**
+     * Décrémente le stock du Locamon concerné par une session payée.
+     * Lit l'id du Locamon dans les metadata de la SESSION (posées au checkout).
+     */
+    private function fulfillOrder(object $session, EntityManagerInterface $em): void
+    {
+        $locamonId = $session->metadata->locamon_id ?? ($session->client_reference_id ?? null);
+
+        if (!$locamonId) {
+            return;
+        }
+
+        $locamon = $em->getRepository(Locamon::class)->find((int) $locamonId);
+
+        // Stock null = illimité : rien à décrémenter.
+        if ($locamon && $locamon->getStock() !== null && $locamon->getStock() > 0) {
+            $locamon->setStock($locamon->getStock() - 1);
+            $em->flush();
+        }
+    }
+
+    private function getStripeSecret(): ?string
+    {
+        return $_ENV['STRIPE_SECRET'] ?? ($_SERVER['STRIPE_SECRET'] ?? null);
     }
 }

@@ -78,7 +78,8 @@
                                 
                                 <!-- Price -->
                                 <div class="mt-4 text-2xl font-bold text-green-600">
-                                    {{ locamon.getPrice()/100 ? locamon.getPrice()/100 ~ '$' : 'N/A' }}
+                                    {% set priceEuros = locamon.getPriceInEuros() %}
+                                    {{ priceEuros is not null ? (priceEuros | number_format(2, ',', ' ')) ~ ' €' : 'N/A' }}
                                 </div>
                                 <div class="text-sm text-gray-600">per day</div>
                             </div>

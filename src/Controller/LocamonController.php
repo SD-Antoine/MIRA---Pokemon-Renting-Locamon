@@ -11,7 +11,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Psr\Log\LoggerInterface;
 
 #[IsGranted('ROLE_ADMIN')]
 class LocamonController extends AbstractController
@@ -31,29 +30,17 @@ class LocamonController extends AbstractController
     }
 
     #[Route('/locamon/new', name: 'locamon.create')]
-    public function new(Request $request, EntityManagerInterface $em, LoggerInterface $logger): Response
+    public function new(Request $request, EntityManagerInterface $em): Response
     {
         $locamon = new Locamon();
         $form = $this->createForm(LocamonType::class, $locamon);
         $form->handleRequest($request);
 
-        $logger->info('Form submitted: ' . ($form->isSubmitted() ? 'YES' : 'NO'));
-        
-        if ($form->isSubmitted()) {
-            $logger->info('Form valid: ' . ($form->isValid() ? 'YES' : 'NO'));
-            
-            foreach ($form->getErrors(true) as $error) {
-                $logger->error('Form error: ' . $error->getMessage());
-            }
-            
-            if ($form->isValid()) {
-                $logger->info('Creating Locamon with pokemon: ' . ($locamon->getPokemon() ? $locamon->getPokemon()->getId() : 'NULL'));
-                $em->persist($locamon);
-                $em->flush();
-                $logger->info('Locamon created with ID: ' . $locamon->getId());
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($locamon);
+            $em->flush();
 
-                return $this->redirectToRoute('locamon.index');
-            }
+            return $this->redirectToRoute('locamon.index');
         }
 
         return $this->render('locamon/new.html.twig', ['form' => $form->createView()]);

@@ -1,5 +1,5 @@
 <nav class="w-[8vw] h-[93vh] fixed top-[50%] left-[0.7vw] flex flex-col justify-center bg-red-600 rounded-[20px]">  
-    <div class="navbar-icon-div w-full absolute top-0 p-[8px]">
+    <div class="navbar-icon-div w-full absolute top-0 p-2">
         <a class="navbar-icon w-full font-poke text-yellow-300 outline-font-poke text-[1.7vw]" href="{{ path('shop.index') }}" title="">
             Locamon
         </a>
@@ -42,12 +42,24 @@
         <!-- Admin pages -->
         {% if is_granted('ROLE_ADMIN') %}
             <hr class="w-3/4 border-gray-700">
-            
-            <a href="{{ path('locamon.index') }}" title="Manage Locamons">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" height="48" width="48">
-                    <circle cx="12" cy="12" r="1"></circle>
-                    <circle cx="12" cy="5" r="1"></circle>
-                    <circle cx="12" cy="19" r="1"></circle>
+
+            {# Gérer les Locamon (liste + édition + suppression) #}
+            <a href="{{ path('locamon.index') }}" title="Gérer les Locamon" class="text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" height="40" width="40">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+            </a>
+
+            {# Ajouter un Locamon #}
+            <a href="{{ path('locamon.create') }}" title="Ajouter un Locamon" class="text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" height="40" width="40">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
             </a>
         {% endif %}

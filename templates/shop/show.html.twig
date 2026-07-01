@@ -77,13 +77,11 @@
                 <div class="mb-8 p-4 bg-green-50 rounded-lg border-2 border-green-200">
                     <p class="text-gray-600 mb-2">Coût journalier:</p>
                     <p class="text-4xl font-bold text-green-600">
-                        {% set storedPrice = locamon.getPrice() %}
-                        {% if storedPrice is null %}
+                        {% set priceEuros = locamon.getPriceInEuros() %}
+                        {% if priceEuros is null %}
                             N/A
-                        {% elseif storedPrice > 10000 %}
-                            {{ (storedPrice / 100) | number_format(2, ',', ' ') }} €
                         {% else %}
-                            {{ storedPrice }} €
+                            {{ priceEuros | number_format(2, ',', ' ') }} €
                         {% endif %}
                     </p>
                 </div>
